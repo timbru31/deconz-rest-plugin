@@ -1,9 +1,10 @@
-name: Compile the REST plugin
-
 on: [push, pull_request]
 
+name: Compile the REST plugin
+
 jobs:
-  build:
+  amd64:
+    name: amd64
     runs-on: ubuntu-latest
 
     steps:
@@ -11,20 +12,53 @@ jobs:
 
     - name: Install dependencies
       run: |
-        wget -O - http://phoscon.de/apt/deconz.pub.key | sudo apt-key add -
-        sudo sh -c "echo 'deb [arch=amd64] http://phoscon.de/apt/deconz \
+        wget -O - https://phoscon.de/apt/deconz.pub.key | sudo apt-key add -
+        sudo sh -c "echo 'deb [arch=amd64] https://phoscon.de/apt/deconz \
             $(lsb_release -cs) main' > \
             /etc/apt/sources.list.d/deconz.list"
-        sudo apt update
-        sudo apt install -y deconz deconz-dev
+        sudo apt-get update -qq
+        sudo apt-get install -qq deconz deconz-dev
 
     - name: Compile the plugin
       run: |
         qmake && make -j2
-        cp ../libde_rest_plugin.so $HOME
+        cp ../libde_rest_plugin.so .
 
     - name: Upload libde_rest_plugin.so
       uses: actions/upload-artifact@v2
       with:
         name: libde_rest_plugin.so.zip
-        path: '~/libde_rest_plugin.so'
+        path: libde_rest_plugin.so
+
+  armv7:
+    name: armv7
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Install dependencies and compile the plugin
+      uses: uraimo/run-on-arch-action@v1.0.9
+      with:
+        architecture: armv7
+        distribution: buster 
+        run: |
+          echo "Installing prerequisites"
+          apt-get update
+          apt-get install -y --no-install-recommends wget lsb-release gnupg2 qt5-default qt5-qmake g++ git libsqlite3-dev libqt5websockets5-dev libqt5serialport5-dev make ca-certificates
+          echo -e "\nInstalling deconz packages"
+          wget -O - https://phoscon.de/apt/deconz.pub.key | apt-key add -
+          wget -O - https://archive.raspberrypi.org/debian/raspberrypi.gpg.key | apt-key add -
+          sh -c "echo 'deb https://phoscon.de/apt/deconz $(lsb_release -cs) main' > /etc/apt/sources.list.d/deconz.list"
+          sh -c "echo 'deb https://archive.raspberrypi.org/debian $(lsb_release -cs) main' > /etc/apt/sources.list.d/raspbian.list"
+          apt-get update
+          apt-get install -y --no-install-recommends deconz-dev
+          echo -e "\nCompiling the plugin"
+          qmake && make -j2
+          cp ../libde_rest_plugin.so .
+
+    - name: Upload libde_rest_plugin.so
+      uses: actions/upload-artifact@v2
+      with:
+        name: libde_rest_plugin.so.zip
+        path: libde_rest_plugin.so
